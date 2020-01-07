@@ -10,4 +10,5 @@ export type Project = {
   name: string;
   id: number;
   color: number;
+  parent_id: number;
 }

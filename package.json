@@ -11,10 +11,12 @@
   "dependencies": {
     "axios": "^0.19.1",
     "dotenv": "^8.2.0",
+    "nedb-promises": "^4.0.1",
     "ts-node": "^8.5.4",
     "typescript": "^3.7.4"
   },
   "devDependencies": {
+    "@types/nedb": "^1.8.9",
     "@types/node": "^13.1.4"
   }
 }
