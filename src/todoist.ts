@@ -1,10 +1,13 @@
 import axios, { AxiosInstance } from 'axios';
 import {v4 as uuid} from 'uuid';
-import { SyncResponse, Project, Item, Note } from './types/todoist';
+import { SyncResponse, Project, Item, Note, Command } from './types/todoist';
 
 export default class Todoist {
+  executeCommandsImmediately = false;
+
   private token: string;
   private http: AxiosInstance;
+  private pendingCommands: Command[] = [];
 
   constructor(token: string) {
     this.token = token
@@ -17,6 +20,30 @@ export default class Todoist {
     return {
       Authorization: `Bearer ${this.token}`
     }
+  }
+
+  private async queueCommand(command: Command) {
+    this.pendingCommands.push(command);
+
+    if (this.executeCommandsImmediately) {
+      await this.commitCommands();
+    }
+  }
+
+  async commitCommands() {
+    if (!this.pendingCommands.length) {
+      return {};
+    }
+
+    const res = await this.http.post<SyncResponse<"items", Item>>('', {
+      commands: JSON.stringify(this.pendingCommands)
+    }, {
+      headers: {
+        ...this.addAuth()
+      }
+    })
+
+    return res.data;
   }
 
   async getProjects() {
@@ -86,83 +113,76 @@ export default class Todoist {
   }
 
   async createItem(content: string, due: Date, project_id?: number) {
-    const command = [{
+    const itemTempId = uuid();
+    const command = {
       type: "item_add",
       uuid: uuid(),
-      temp_id: uuid(),
+      temp_id: itemTempId,
       args: {
         content,
         project_id,
-        due: {date: due.toISOString().substring(0, 19) + 'Z'}
+        due: {date: this.dateToTodoist(due)}
       }
-    }]
+    }
 
-    const res = await this.http.post<SyncResponse<"items", Item>>('', {
-      // resource_types: '["items"]'
-      commands: JSON.stringify(command)
-    }, {
-      headers: {
-        ...this.addAuth()
-      }
-    })
+    await this.queueCommand(command)
+
+    return itemTempId;
   }
 
-  async updateItem(itemId: number, content: string, due: Date, project_id?: number) {
-    const command = [{
-      type: "item_add",
+  async updateItem(item: Item | number | string, content: string, due?: Date | null, project_id?: number) {
+    const id = typeof item === 'object' ? item.id : item
+
+    const command: Command = {
+      type: "item_update",
       uuid: uuid(),
       temp_id: uuid(),
       args: {
-        id: itemId,
+        id,
         content,
         project_id,
-        due: {date: due.toISOString().substring(0, 19) + 'Z'}
       }
-    }]
+    }
 
-    const res = await this.http.post<SyncResponse<"items", Item>>('', {
-      // resource_types: '["items"]'
-      commands: JSON.stringify(command)
-    }, {
-      headers: {
-        ...this.addAuth()
-      }
-    })
+    command.args.due = (due === null) ? null : 
+                       (due) ? {date: this.dateToTodoist(due)} : 
+                       undefined
+
+    await this.queueCommand(command);
   }
 
-  async completeItem(item: Item, dateCompleted: Date = new Date()) {
-    const command = [{
+  async completeItem(item: Item | number | string, dateCompleted: Date = new Date()) {
+    const id = typeof item === 'object' ? item.id : item
+
+    const command: Command = {
       type: "item_complete",
       uuid: uuid(),
-      args: {
-        id: item.id,
-        date_completed: dateCompleted.toISOString().substring(0, 19) + 'Z',
-      }
-    }]
-
-    await this.http.post<SyncResponse<"items", Item>>('', {
-      commands: JSON.stringify(command)
-    }, {
-      headers: this.addAuth()
-    })
-  }
-
-  async addNote(item: Item, content: string) {
-    const command = [{
-      type: "note_add",
-      uuid: uuid(),
       temp_id: uuid(),
       args: {
-        content,
-        item_id: item.id,
+        id: id,
+        date_completed: this.dateToTodoist(dateCompleted),
       }
-    }]
+    }
 
-    await this.http.post<SyncResponse<"items", Item>>('', {
-      commands: JSON.stringify(command)
-    }, {
-      headers: this.addAuth()
-    })
+    await this.queueCommand(command);
+  }
+
+  async addNote(item: Item | number | string, content: string) {
+    const id = typeof item === 'object' ? item.id : item
+
+    const tempId = uuid();
+    const command = {
+      type: "note_add",
+      uuid: uuid(),
+      temp_id: tempId,
+      args: {
+        content,
+        item_id: id,
+      }
+    }
+
+    await this.queueCommand(command);
+    return tempId;
   }
 
   getNotesForItem(item: Item, allNotes: Note[]) {
@@ -173,6 +193,10 @@ export default class Todoist {
 
   isItemManaged(item: Item, itemNotes: Note[]) {
     return itemNotes.length && itemNotes[0].content.startsWith('CanvasID: ')
+  }
+
+  dateToTodoist(date: Date) {
+    return date.toISOString().substring(0, 19) + 'Z'
   }
 
 }

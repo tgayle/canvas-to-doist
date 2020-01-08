@@ -42,3 +42,10 @@ export type Note = {
 }
 
 export type ParseThisStringAsDate = string;
+
+export type Command = {
+  type: string;
+  args: {[key: string]: any};
+  uuid: string;
+  temp_id: string;
+}

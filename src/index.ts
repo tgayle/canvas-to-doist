@@ -3,8 +3,8 @@ import { config } from 'dotenv';
 import Todoist from './todoist';
 import buildDatabase from './db';
 import canvasToTodoistMap from './canvasTodoistMappings'
-import { Assignment } from './types/canvas';
-import { Item, Note } from './types/todoist';
+import { Assignment, Course } from './types/canvas';
+import { Item, Note, Project } from './types/todoist';
 
 (async function () {
   config()
@@ -20,6 +20,10 @@ import { Item, Note } from './types/todoist';
 
   const items = await doist.getItems();
 
+  // await processCourses(canvas, doist, courses, projects, notes);
+})()
+
+async function processCourses(canvas: Canvas, doist: Todoist, courses: Course[], projects: Project[], notes: Note[]) {
   for (const course of courses) {
     const projectId = canvasToTodoistMap[course.id]
     const project = projects.find(proj => proj.id === projectId)
@@ -40,11 +44,10 @@ import { Item, Note } from './types/todoist';
         updateItemAsNecessary(canvas, doist, assignment, item, notes)
       } else {
         createAssignmentItem(canvas, doist, assignment)
-        // TODO: Promise.map and await all at and or queue commands and commit at end.
       }
     }
   }
-})()
+}
 
 async function updateItemAsNecessary(canvas: Canvas, todoist: Todoist, assignment: Assignment, item: Item, notes: Note[]) {
 
