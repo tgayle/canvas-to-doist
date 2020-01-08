@@ -41,3 +41,16 @@ export type Enrollment = {
   computed_current_score: number;
   computed_final_score: number;
 }
+
+export type Assignment = {
+  id: number;
+  description: string;
+  due_at: string;
+  points_possible: number;
+  course_id: number;
+  name: string;
+  html_url: string;
+  published: boolean;
+  is_quiz_assignment: boolean,
+  
+}

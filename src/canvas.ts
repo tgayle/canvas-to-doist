@@ -1,5 +1,5 @@
 import axios, { AxiosInstance } from 'axios';
-import { PotentialCourse, LockedCourse, Course } from './types/canvas';
+import { PotentialCourse, LockedCourse, Course, Assignment } from './types/canvas';
 
 export default class Canvas {
   private token: string;
@@ -36,6 +36,16 @@ export default class Canvas {
     const courses = response.data.filter(isValidCourse)
 
     return courses;
+  }
+
+  async getAssignments(courseId: number) {
+    const response = await this.http.get<Assignment[]>(`/courses/${courseId}/assignments`, {
+      headers: this.addAuth(),
+      params: {
+        per_page: 1000,
+      }
+    })
+    return response.data;
   }
 
 }

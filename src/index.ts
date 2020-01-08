@@ -13,18 +13,13 @@ import { projects as canvasToTodoistMap } from '../mappings.json'
   const canvas = new Canvas(process.env.CANVAS!!, "fgcu")
   const doist = new Todoist(process.env.TODOIST!!)
 
-  const courses = await canvas.getCourses()
+  let [courses, projects] = await Promise.all([canvas.getCourses(), doist.getProjects()])
 
-  courses
-    .filter(c => c.enrollment_term_id === 286)
-    .forEach(c => console.log(`(${c.enrollment_term_id}) ${c.name} - ${c.id}`))
+  courses = courses.filter(c => c.enrollment_term_id === 286)
 
-  const projects = await doist.getProjects()
-  projects.map(p => ({
-    name: p.name,
-    id: p.id,
-    parent: p.parent_id
-  }))
-    .filter(p => p.parent === 2226258308)
-    .forEach(p => console.log(`(${p.id}) ${p.name}`))
+
+  courses.forEach(c => console.log(`(${c.enrollment_term_id}) ${c.name} - ${c.id}`))
+
+  const assignments = await canvas.getAssignments(courses[0].id)
+  assignments.forEach(a => console.log(a.name))
 })()
