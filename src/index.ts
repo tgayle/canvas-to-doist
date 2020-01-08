@@ -3,6 +3,8 @@ import { config } from 'dotenv';
 import Todoist from './todoist';
 import buildDatabase from './db';
 import canvasToTodoistMap from './canvasTodoistMappings'
+import { Assignment } from './types/canvas';
+import { Item, Note } from './types/todoist';
 
 (async function () {
   config()
@@ -12,30 +14,41 @@ import canvasToTodoistMap from './canvasTodoistMappings'
   const canvas = new Canvas(process.env.CANVAS!!, "fgcu")
   const doist = new Todoist(process.env.TODOIST!!)
 
-  let [courses, projects] = await Promise.all([canvas.getCourses(), doist.getProjects()])
+  let [courses, projects, notes] = await Promise.all([canvas.getCourses(), doist.getProjects(), doist.getNotes()])
 
   courses = courses.filter(c => c.enrollment_term_id === 286)
 
-  const notes = await doist.getNotes();
-  const items = await doist.getProjectItems(2226258353);
+  for (const course of courses) {
+    const projectId = canvasToTodoistMap[course.id]
+    const project = projects.find(proj => proj.id === projectId)
 
-  await doist.createItem('test item!', new Date(), 2226258353)
+    if (!project) {
+      console.error(`Course ${course.name} (${course.id}) did not have a corresponding Todoist project, skipping...`)
+      continue
+    }
 
-  // const itemNotes = doist.getNotesForItem(items[0], notes)
-  // console.log(itemNotes);
-  // for (const course of courses) {
-  //   const projectId = canvasToTodoistMap[course.id]
-  //   const project = projects.find(proj => proj.id === projectId)
+    const assignments = await canvas.getAssignments(course.id)
+    const [courseItems, assignmentToItems] = await doist.getProjectItemsMap(project.id, notes)
+    console.log(course.name)
 
-  //   if (!project) {
-  //     console.error(`Course ${course.name} (${course.id}) did not have a corresponding Todoist project, skipping...`)
-  //     continue
-  //   }
+    for (const assignment of assignments) {
+      const itemId = assignmentToItems[assignment.id];
+      if (itemId) {
+        const item = courseItems.find(item => item.id == itemId) as Item // can't be null at this point
+        updateItemAsNecessary(canvas, doist, assignment, item, notes)
+      } else {
+        createAssignmentItem(canvas, doist, assignment)
+        // TODO: Promise.map and await all at and or queue commands and commit at end.
+      }
+    }
 
-  //   const projectItems = await doist.getProjectItems(project.id)
-  //   console.log(course.name)
-  //   projectItems.forEach(item => console.log('\t', item))
-  // }
-
-
+  }
 })()
+
+async function updateItemAsNecessary(canvas: Canvas, todoist: Todoist, assignment: Assignment, item: Item, notes: Note[]) {
+
+}
+
+async function createAssignmentItem(canvas: Canvas, todoist: Todoist, assignment: Assignment) {
+
+}

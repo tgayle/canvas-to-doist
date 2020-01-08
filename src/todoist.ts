@@ -55,7 +55,7 @@ export default class Todoist {
     return res.data.notes;
   }
 
-  async getProjectItemsMap(projectId: number, allNotes: Note[]) {
+  async getProjectItemsMap(projectId: number, allNotes: Note[]): Promise<[Item[], {[key: number]: number}]> {
     const res = await this.http.post<SyncResponse<"items", Item>>('', {
       resource_types: '["items"]'
     }, {
