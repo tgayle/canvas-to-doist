@@ -1,5 +1,5 @@
 import axios, { AxiosInstance } from 'axios';
-import { PotentialCourse, LockedCourse, Course, Assignment } from './types/canvas';
+import { PotentialCourse, Course, Assignment, AssignmentSubmission } from './types/canvas';
 
 export default class Canvas {
   private token: string;
@@ -12,6 +12,7 @@ export default class Canvas {
 
     this.http = axios.create({
       baseURL: `https://${this.domain}.instructure.com/api/v1/`,
+      headers: this.addAuth(),
     });
   }
 
@@ -23,9 +24,6 @@ export default class Canvas {
 
   async getCourses() {
     const response = await this.http.get<PotentialCourse[]>('/courses', {
-      headers: {
-        ...this.addAuth()
-      },
       params: {
         enrollment_type: 'student',
         include: ['sections', 'total_students', 'teachers', 'total_scores'],
@@ -40,12 +38,29 @@ export default class Canvas {
 
   async getAssignments(courseId: number) {
     const response = await this.http.get<Assignment[]>(`/courses/${courseId}/assignments`, {
-      headers: this.addAuth(),
       params: {
         per_page: 1000,
       }
     })
     return response.data;
+  }
+
+  async getSubmissions(courseId: number): Promise<{[key: number]: AssignmentSubmission}> {
+    const response = await this.http.get<AssignmentSubmission[]>(`/courses/${courseId}/students/submissions`, {
+      params: {
+        per_page: 1000,
+      }
+    })
+    
+    const submissions = response.data;
+
+    const assignmentIdToSubmission: {[key: number]: AssignmentSubmission} = {};
+
+    submissions.forEach(submission => {
+      assignmentIdToSubmission[submission.assignment_id] =  submission
+    })
+
+    return assignmentIdToSubmission;
   }
 
 }

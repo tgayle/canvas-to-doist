@@ -185,6 +185,24 @@ export default class Todoist {
     return tempId;
   }
 
+  async updateNote(item: Item | number | string, content: string) {
+    const id = typeof item === 'object' ? item.id : item
+
+    const tempId = uuid();
+    const command = {
+      type: "note_update",
+      uuid: uuid(),
+      temp_id: tempId,
+      args: {
+        id,
+        content,
+      }
+    }
+
+    await this.queueCommand(command);
+    return tempId;
+  }
+
   getNotesForItem(item: Item, allNotes: Note[]) {
     return allNotes
     .filter(note => note.item_id === item.id)

@@ -1,3 +1,5 @@
+import { ParseThisStringAsDate } from "./todoist"
+
 export type PotentialCourse = LockedCourse | Course
 
 export type LockedCourse = {
@@ -47,10 +49,18 @@ export type Assignment = {
   description: string;
   due_at: string;
   points_possible: number;
+  has_submitted_submissions: boolean;
   course_id: number;
   name: string;
   html_url: string;
   published: boolean;
   is_quiz_assignment: boolean,
-  
+
+}
+
+export type AssignmentSubmission = {
+  id: number;
+  workflow_state: 'submitted' | 'unsubmitted' | 'graded' | 'pending_review';
+  submitted_at: ParseThisStringAsDate;
+  assignment_id: number;
 }
