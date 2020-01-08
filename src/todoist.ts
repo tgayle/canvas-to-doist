@@ -102,6 +102,50 @@ export default class Todoist {
     })
   }
 
+  async updateItem(itemId: number, content: string, due: Date, project_id?: number) {
+    const command = [{
+      type: "item_add",
+      uuid: uuid(),
+      temp_id: uuid(),
+      args: {
+        id: itemId,
+        content,
+        project_id,
+        due: {date: due.toISOString().substring(0, 19) + 'Z'}
+      }
+    }]
+
+    const res = await this.http.post<SyncResponse<"items", Item>>('', {
+      // resource_types: '["items"]'
+      commands: JSON.stringify(command)
+    }, {
+      headers: {
+        ...this.addAuth()
+      }
+    })
+  }
+
+  async completeItem(item: Item, dateCompleted: Date = new Date()) {
+    const command = [{
+      type: "item_complete",
+      uuid: uuid(),
+      args: {
+        id: item.id,
+        date_completed: dateCompleted.toISOString().substring(0, 19) + 'Z',
+      }
+    }]
+
+    await this.http.post<SyncResponse<"items", Item>>('', {
+      commands: JSON.stringify(command)
+    }, {
+      headers: this.addAuth()
+    })
+  }
+
+  async addNote(item: Item, content: string) {
+
+  }
+
   getNotesForItem(item: Item, allNotes: Note[]) {
     return allNotes
     .filter(note => note.item_id === item.id)
