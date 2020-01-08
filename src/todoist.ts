@@ -31,7 +31,7 @@ export default class Todoist {
     return res.data.projects;
   }
 
-  async getProjectItems(projectId: number) {
+  async getItems() {
     const res = await this.http.post<SyncResponse<"items", Item>>('', {
       resource_types: '["items"]'
     }, {
@@ -40,7 +40,12 @@ export default class Todoist {
       }
     })
 
-    return res.data.items.filter(item => item.project_id === projectId);
+    return res.data;
+  }
+
+  async getProjectItems(projectId: number) {
+    const result = await this.getItems();
+    return result.items.filter(item => item.project_id === projectId);
   }
 
   async getNotes() {

@@ -18,6 +18,8 @@ import { Item, Note } from './types/todoist';
 
   courses = courses.filter(c => c.enrollment_term_id === 286)
 
+  const items = await doist.getItems();
+
   for (const course of courses) {
     const projectId = canvasToTodoistMap[course.id]
     const project = projects.find(proj => proj.id === projectId)
@@ -41,7 +43,6 @@ import { Item, Note } from './types/todoist';
         // TODO: Promise.map and await all at and or queue commands and commit at end.
       }
     }
-
   }
 })()
 
