@@ -1,5 +1,6 @@
 import axios, { AxiosInstance } from 'axios';
-import { SyncResponse, Project } from './types/todoist';
+import {v4 as uuid} from 'uuid';
+import { SyncResponse, Project, Item, Note } from './types/todoist';
 
 export default class Todoist {
   private token: string;
@@ -28,6 +29,87 @@ export default class Todoist {
     })
 
     return res.data.projects;
+  }
+
+  async getProjectItems(projectId: number) {
+    const res = await this.http.post<SyncResponse<"items", Item>>('', {
+      resource_types: '["items"]'
+    }, {
+      headers: {
+        ...this.addAuth()
+      }
+    })
+
+    return res.data.items.filter(item => item.project_id === projectId);
+  }
+
+  async getNotes() {
+    const res = await this.http.post<SyncResponse<"notes", Note>>('', {
+      resource_types: '["notes"]'
+    }, {
+      headers: {
+        ...this.addAuth()
+      }
+    })
+
+    return res.data.notes;
+  }
+
+  async getProjectItemsMap(projectId: number, allNotes: Note[]) {
+    const res = await this.http.post<SyncResponse<"items", Item>>('', {
+      resource_types: '["items"]'
+    }, {
+      headers: {
+        ...this.addAuth()
+      }
+    })
+
+    const managedItems = res
+      .data
+      .items
+      .filter(item => item.project_id === projectId && this.isItemManaged(item, allNotes)) ;
+    
+    const assignmentToItemId: {[key: number]: number} = {}; 
+
+
+    managedItems.forEach(item => {
+      const itemNotes = this.getNotesForItem(item, allNotes)
+      assignmentToItemId[Number(itemNotes[0].content.split(' ')[1])] = item.id
+    })
+
+    return [managedItems, assignmentToItemId]
+  }
+
+  async createItem(content: string, due: Date, project_id?: number) {
+    const command = [{
+      type: "item_add",
+      uuid: uuid(),
+      temp_id: uuid(),
+      args: {
+        content,
+        project_id,
+        due: {date: due.toISOString().substring(0, 19) + 'Z'}
+      }
+    }]
+
+    const res = await this.http.post<SyncResponse<"items", Item>>('', {
+      // resource_types: '["items"]'
+      commands: JSON.stringify(command)
+    }, {
+      headers: {
+        ...this.addAuth()
+      }
+    })
+  }
+
+  getNotesForItem(item: Item, allNotes: Note[]) {
+    return allNotes
+    .filter(note => note.item_id === item.id)
+    .sort((a, b) => a.id - b.id)
+  }
+
+  isItemManaged(item: Item, itemNotes: Note[]) {
+    return itemNotes.length && itemNotes[0].content.startsWith('CanvasID: ')
   }
 
 }

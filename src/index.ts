@@ -2,8 +2,7 @@ import Canvas from './canvas';
 import { config } from 'dotenv';
 import Todoist from './todoist';
 import buildDatabase from './db';
-
-import { projects as canvasToTodoistMap } from '../mappings.json'
+import canvasToTodoistMap from './canvasTodoistMappings'
 
 (async function () {
   config()
@@ -17,9 +16,26 @@ import { projects as canvasToTodoistMap } from '../mappings.json'
 
   courses = courses.filter(c => c.enrollment_term_id === 286)
 
+  const notes = await doist.getNotes();
+  const items = await doist.getProjectItems(2226258353);
 
-  courses.forEach(c => console.log(`(${c.enrollment_term_id}) ${c.name} - ${c.id}`))
+  await doist.createItem('test item!', new Date(), 2226258353)
 
-  const assignments = await canvas.getAssignments(courses[0].id)
-  assignments.forEach(a => console.log(a.name))
+  // const itemNotes = doist.getNotesForItem(items[0], notes)
+  // console.log(itemNotes);
+  // for (const course of courses) {
+  //   const projectId = canvasToTodoistMap[course.id]
+  //   const project = projects.find(proj => proj.id === projectId)
+
+  //   if (!project) {
+  //     console.error(`Course ${course.name} (${course.id}) did not have a corresponding Todoist project, skipping...`)
+  //     continue
+  //   }
+
+  //   const projectItems = await doist.getProjectItems(project.id)
+  //   console.log(course.name)
+  //   projectItems.forEach(item => console.log('\t', item))
+  // }
+
+
 })()
