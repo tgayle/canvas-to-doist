@@ -143,7 +143,21 @@ export default class Todoist {
   }
 
   async addNote(item: Item, content: string) {
+    const command = [{
+      type: "note_add",
+      uuid: uuid(),
+      temp_id: uuid(),
+      args: {
+        content,
+        item_id: item.id,
+      }
+    }]
 
+    await this.http.post<SyncResponse<"items", Item>>('', {
+      commands: JSON.stringify(command)
+    }, {
+      headers: this.addAuth()
+    })
   }
 
   getNotesForItem(item: Item, allNotes: Note[]) {
