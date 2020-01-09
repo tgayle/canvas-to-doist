@@ -1,15 +1,12 @@
 import Canvas from './canvas';
 import { config } from 'dotenv';
 import Todoist from './todoist';
-import buildDatabase from './db';
 import canvasToTodoistMap from './canvasTodoistMappings'
 import { Assignment, Course, AssignmentSubmission } from './types/canvas';
 import { Item, Note, Project, ItemLike } from './types/todoist';
 
 (async function () {
   config()
-  const db = buildDatabase()
-  await db.load()
 
   const canvas = new Canvas(process.env.CANVAS!!, "fgcu")
   const doist = new Todoist(process.env.TODOIST!!)
