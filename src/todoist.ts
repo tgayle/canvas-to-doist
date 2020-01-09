@@ -1,5 +1,5 @@
-import axios, { AxiosInstance } from 'axios';
-import {v4 as uuid} from 'uuid';
+import axios, { AxiosInstance, AxiosResponse } from 'axios';
+import { v4 as uuid } from 'uuid';
 import { SyncResponse, Project, Item, Note, Command } from './types/todoist';
 
 export default class Todoist {
@@ -7,52 +7,60 @@ export default class Todoist {
 
   private token: string;
   private http: AxiosInstance;
-  private pendingCommands: Command[] = [];
+  pendingCommands: Command[] = [];
 
   constructor(token: string) {
     this.token = token
     this.http = axios.create({
+      headers: {
+        Authorization: `Bearer ${this.token}`
+      },
       baseURL: 'https://api.todoist.com/sync/v8/sync',
     });
-  }
-
-  private addAuth() {
-    return {
-      Authorization: `Bearer ${this.token}`
-    }
   }
 
   private async queueCommand(command: Command) {
     this.pendingCommands.push(command);
 
     if (this.executeCommandsImmediately) {
-      await this.commitCommands();
+      await this.commitCommands(this.pendingCommands);
     }
   }
 
-  async commitCommands() {
-    if (!this.pendingCommands.length) {
-      return {};
+  async commitCommands(commands: Command[] = this.pendingCommands) {
+    if (!commands.length) {
+      return [];
     }
 
-    const res = await this.http.post<SyncResponse<"items", Item>>('', {
-      commands: JSON.stringify(this.pendingCommands)
-    }, {
-      headers: {
-        ...this.addAuth()
-      }
-    })
+    const results: SyncResponse<"", Item>[] = [];
 
-    return res.data;
+    if (commands.length > 100) {
+      for (const commandChunk of this.chunkArrayInGroups(commands, 100)) {
+        results.push(...(await this.commitCommands(commandChunk)).flat())
+      }
+      return results;
+    }
+
+    let res: any = {};
+
+    try {
+      res = await this.http.post<SyncResponse<"items", Item>>('', {
+        commands: JSON.stringify(commands)
+      }, {
+      })
+    } catch (error) {
+      console.error(error.response);
+    }
+
+    results.push(res);
+
+    return results;
   }
 
   async getProjects() {
     const res = await this.http.post<SyncResponse<"projects", Project>>('', {
       resource_types: '["projects"]'
     }, {
-      headers: {
-        ...this.addAuth()
-      }
     })
 
     return res.data.projects;
@@ -62,46 +70,40 @@ export default class Todoist {
     const res = await this.http.post<SyncResponse<"items", Item>>('', {
       resource_types: '["items"]'
     }, {
-      headers: {
-        ...this.addAuth()
-      }
     })
 
     return res.data;
   }
 
   async getProjectItems(projectId: number) {
-    const result = await this.getItems();
-    return result.items.filter(item => item.project_id === projectId);
+    const [uncompleted, [completedItems, completedTodos]] = await Promise.all([this.getItems(), this.getCompletedItems(projectId)]);
+
+    const res = uncompleted.items.filter(item => item.project_id === projectId);
+    res.push(...completedItems);
+    return res;
   }
 
   async getNotes() {
     const res = await this.http.post<SyncResponse<"notes", Note>>('', {
       resource_types: '["notes"]'
     }, {
-      headers: {
-        ...this.addAuth()
-      }
     })
 
     return res.data.notes;
   }
 
-  async getProjectItemsMap(projectId: number, allNotes: Note[]): Promise<[Item[], {[key: number]: number}]> {
-    const res = await this.http.post<SyncResponse<"items", Item>>('', {
-      resource_types: '["items"]'
-    }, {
-      headers: {
-        ...this.addAuth()
-      }
-    })
+  async getProjectItemsMap(projectId: number, allNotes: Note[]): Promise<[Item[], { [key: number]: number }]> {
+    const [ uncompletedItems, [completedItems, completedItemNotes]] = await Promise.all([
+      this.getProjectItems(projectId), 
+      this.getCompletedItems(projectId)
+    ])
 
-    const managedItems = res
-      .data
-      .items
-      .filter(item => item.project_id === projectId && this.isItemManaged(item, allNotes)) ;
-    
-    const assignmentToItemId: {[key: number]: number} = {}; 
+    // TODO: Don't mutate this array like this.
+    allNotes.push(...completedItemNotes)
+    const managedItems = [...uncompletedItems, ...completedItems]
+      .filter(this.itemIsManaged(projectId, allNotes));
+
+    const assignmentToItemId: { [key: number]: number } = {};
 
 
     managedItems.forEach(item => {
@@ -110,6 +112,12 @@ export default class Todoist {
     })
 
     return [managedItems, assignmentToItemId]
+  }
+
+  itemIsManaged(projectId: number, allNotes: Note[]) {
+    return (item: Item) => {
+      return item.project_id === projectId && this.isItemManaged(item, this.getNotesForItem(item, allNotes));
+    }
   }
 
   async createItem(content: string, due: Date, project_id?: number) {
@@ -121,7 +129,7 @@ export default class Todoist {
       args: {
         content,
         project_id,
-        due: {date: this.dateToTodoist(due)}
+        due: { date: this.dateToTodoist(due) }
       }
     }
 
@@ -144,9 +152,9 @@ export default class Todoist {
       }
     }
 
-    command.args.due = (due === null) ? null : 
-                       (due) ? {date: this.dateToTodoist(due)} : 
-                       undefined
+    command.args.due = (due === null) ? null :
+      (due) ? { date: this.dateToTodoist(due) } :
+        undefined
 
     await this.queueCommand(command);
   }
@@ -203,18 +211,47 @@ export default class Todoist {
     return tempId;
   }
 
+  async getCompletedItems(projectId: number): Promise<[Item[], Note[]]> {
+    const allItems: Item[] = [];
+    const notes: Note[] = [];
+
+    let numSeenLast = 0;
+
+    do {
+      const {data} = await this.http.post<{ items: (Item & { notes: Note[] })[] }>('https://api.todoist.com/sync/v8/completed/get_all', {
+        project_id: projectId,
+        annotate_notes: true,
+        limit: 200,
+        offset: numSeenLast
+      });
+
+      numSeenLast = data.items.length;
+      allItems.push(...data.items)
+      notes.push(...data.items.map(item => item.notes).flat())
+    } while (numSeenLast != 0);
+
+    return [allItems, notes];
+  }
+
   getNotesForItem(item: Item, allNotes: Note[]) {
     return allNotes
-    .filter(note => note.item_id === item.id)
-    .sort((a, b) => a.id - b.id)
+      .filter(note => note.item_id === item.id)
+      .sort((a, b) => a.id - b.id)
   }
 
   isItemManaged(item: Item, itemNotes: Note[]) {
-    return itemNotes.length && itemNotes[0].content.startsWith('CanvasID: ')
+    return itemNotes.length && itemNotes.some(note => note.content.startsWith('CanvasID:'))
   }
 
   dateToTodoist(date: Date) {
     return date.toISOString().substring(0, 19) + 'Z'
   }
 
+  chunkArrayInGroups<T>(arr: T[], size: number) {
+    const myArray: T[][] = [];
+    for (let i = 0; i < arr.length; i += size) {
+      myArray.push(arr.slice(i, i + size));
+    }
+    return myArray;
+  }
 }
