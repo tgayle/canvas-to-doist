@@ -1,6 +1,14 @@
 import axios, { AxiosInstance, AxiosResponse } from 'axios';
 import { v4 as uuid } from 'uuid';
-import { SyncResponse, Project, Item, Note, Command, CompletedItem, ItemLike } from './types/todoist';
+import {
+  SyncResponse,
+  Project,
+  Item,
+  Note,
+  Command,
+  CompletedItem,
+  ItemLike
+} from './types/todoist';
 
 export default class Todoist {
   executeCommandsImmediately = false;
@@ -10,12 +18,12 @@ export default class Todoist {
   pendingCommands: Command[] = [];
 
   constructor(token: string) {
-    this.token = token
+    this.token = token;
     this.http = axios.create({
       headers: {
         Authorization: `Bearer ${this.token}`
       },
-      baseURL: 'https://api.todoist.com/sync/v8/sync',
+      baseURL: 'https://api.todoist.com/sync/v8/sync'
     });
   }
 
@@ -32,11 +40,11 @@ export default class Todoist {
       return [];
     }
 
-    const results: SyncResponse<"", Item>[] = [];
+    const results: SyncResponse<'', Item>[] = [];
 
     if (commands.length > 100) {
       for (const commandChunk of this.chunkArrayInGroups(commands, 100)) {
-        results.push(...(await this.commitCommands(commandChunk)).flat())
+        results.push(...(await this.commitCommands(commandChunk)).flat());
       }
       return results;
     }
@@ -44,10 +52,13 @@ export default class Todoist {
     let res: any = {};
 
     try {
-      res = await this.http.post<SyncResponse<"items", Item>>('', {
-        commands: JSON.stringify(commands)
-      }, {
-      })
+      res = await this.http.post<SyncResponse<'items', Item>>(
+        '',
+        {
+          commands: JSON.stringify(commands)
+        },
+        {}
+      );
     } catch (error) {
       console.error(error.response);
     }
@@ -58,78 +69,103 @@ export default class Todoist {
   }
 
   async getProjects() {
-    const res = await this.http.post<SyncResponse<"projects", Project>>('', {
-      resource_types: '["projects"]'
-    }, {
-    })
+    const res = await this.http.post<SyncResponse<'projects', Project>>(
+      '',
+      {
+        resource_types: '["projects"]'
+      },
+      {}
+    );
 
     return res.data.projects;
   }
 
   async getItems() {
-    const res = await this.http.post<SyncResponse<"items", Item>>('', {
-      resource_types: '["items"]'
-    }, {
-    })
+    const res = await this.http.post<SyncResponse<'items', Item>>(
+      '',
+      {
+        resource_types: '["items"]'
+      },
+      {}
+    );
 
     return res.data;
   }
 
   async getProjectItems(projectId: number) {
-    const [uncompleted, [completedItems, completedNotes]] = await Promise.all([this.getItems(), this.getCompletedItems(projectId)]);
+    const [uncompleted, [completedItems, completedNotes]] = await Promise.all([
+      this.getItems(),
+      this.getCompletedItems(projectId)
+    ]);
 
-    const uncompletedItems: ItemLike[] = uncompleted.items
+    const uncompletedItems: ItemLike[] = uncompleted.items;
     const res = uncompletedItems.filter(item => item.project_id === projectId);
     res.push(...completedItems);
     return res;
   }
 
   async getNotes() {
-    const res = await this.http.post<SyncResponse<"notes", Note>>('', {
-      resource_types: '["notes"]'
-    }, {
-    })
+    const res = await this.http.post<SyncResponse<'notes', Note>>(
+      '',
+      {
+        resource_types: '["notes"]'
+      },
+      {}
+    );
 
     return res.data.notes;
   }
 
-  async getProjectItemsMap(projectId: number, allNotes: Note[]): Promise<{ [key: number]: ItemLike }> {
-    const [ uncompletedItems, [completedItems, completedItemNotes]] = await Promise.all([
-      this.getProjectItems(projectId), 
+  async getProjectItemsMap(
+    projectId: number,
+    allNotes: Note[]
+  ): Promise<{ [key: number]: ItemLike }> {
+    const [
+      uncompletedItems,
+      [completedItems, completedItemNotes]
+    ] = await Promise.all([
+      this.getProjectItems(projectId),
       this.getCompletedItems(projectId)
-    ])
+    ]);
 
     // TODO: Don't mutate this array like this.
-    allNotes.push(...completedItemNotes)
-    const managedItems = [...uncompletedItems, ...completedItems]
-      .filter(this.itemIsManaged(projectId, allNotes));
+    allNotes.push(...completedItemNotes);
+    const managedItems = [...uncompletedItems, ...completedItems].filter(
+      this.itemIsManaged(projectId, allNotes)
+    );
 
     const assignmentToItemId: { [key: number]: ItemLike } = {};
 
-
     managedItems.forEach(item => {
-      const itemNotes = this.getNotesForItem(item, allNotes)
-      const assignmentIdItem = itemNotes.find(note => note.content.startsWith('CanvasID'))
-      
+      const itemNotes = this.getNotesForItem(item, allNotes);
+      const assignmentIdItem = itemNotes.find(note =>
+        note.content.startsWith('CanvasID')
+      );
+
       if (assignmentIdItem) {
         const noteText = assignmentIdItem.content;
-        assignmentToItemId[Number(noteText.substring(noteText.indexOf(' ')).trim())] = item
+        assignmentToItemId[
+          Number(noteText.substring(noteText.indexOf(' ')).trim())
+        ] = item;
       }
-    })
+    });
 
-    return assignmentToItemId
+    return assignmentToItemId;
   }
 
   itemIsManaged(projectId: number, allNotes: Note[]) {
     return (item: ItemLike) => {
-      return item.project_id === projectId && this.isItemManaged(item, this.getNotesForItem(item, allNotes));
-    }
+      return (
+        item.project_id === projectId &&
+        this.isItemManaged(item, this.getNotesForItem(item, allNotes))
+      );
+    };
   }
 
   async createItem(content: string, due: Date, project_id?: number) {
     const itemTempId = uuid();
     const command = {
-      type: "item_add",
+      type: 'item_add',
       uuid: uuid(),
       temp_id: itemTempId,
       args: {
@@ -137,81 +173,88 @@ export default class Todoist {
         project_id,
         due: { date: this.dateToTodoist(due) }
       }
-    }
+    };
 
-    await this.queueCommand(command)
+    await this.queueCommand(command);
 
     return itemTempId;
   }
 
-  async updateItem(item: Item | number | string, content: string, due?: Date | null, project_id?: number) {
-    const id = typeof item === 'object' ? item.id : item
+  async updateItem(
+    item: Item | number | string,
+    content: string,
+    due?: Date | null,
+    project_id?: number
+  ) {
+    const id = typeof item === 'object' ? item.id : item;
 
     const command: Command = {
-      type: "item_update",
+      type: 'item_update',
       uuid: uuid(),
       temp_id: uuid(),
       args: {
         id,
         content,
-        project_id,
+        project_id
       }
-    }
+    };
 
-    command.args.due = (due === null) ? null :
-      (due) ? { date: this.dateToTodoist(due) } :
-        undefined
+    command.args.due =
+      due === null ? null : due ? { date: this.dateToTodoist(due) } : undefined;
 
     await this.queueCommand(command);
   }
 
-  async completeItem(item: Item | number | string, dateCompleted: Date = new Date()) {
-    const id = typeof item === 'object' ? item.id : item
+  async completeItem(
+    item: Item | number | string,
+    dateCompleted: Date = new Date()
+  ) {
+    const id = typeof item === 'object' ? item.id : item;
 
     const command: Command = {
-      type: "item_complete",
+      type: 'item_complete',
       uuid: uuid(),
       temp_id: uuid(),
       args: {
         id: id,
-        date_completed: this.dateToTodoist(dateCompleted),
+        date_completed: this.dateToTodoist(dateCompleted)
       }
-    }
+    };
 
     await this.queueCommand(command);
   }
 
   async addNote(item: Item | number | string, content: string) {
-    const id = typeof item === 'object' ? item.id : item
+    const id = typeof item === 'object' ? item.id : item;
 
     const tempId = uuid();
     const command = {
-      type: "note_add",
+      type: 'note_add',
       uuid: uuid(),
       temp_id: tempId,
       args: {
         content,
-        item_id: id,
+        item_id: id
       }
-    }
+    };
 
     await this.queueCommand(command);
     return tempId;
   }
 
   async updateNote(item: Item | number | string, content: string) {
-    const id = typeof item === 'object' ? item.id : item
+    const id = typeof item === 'object' ? item.id : item;
 
     const tempId = uuid();
     const command = {
-      type: "note_update",
+      type: 'note_update',
       uuid: uuid(),
       temp_id: tempId,
       args: {
         id,
-        content,
+        content
       }
-    }
+    };
 
     await this.queueCommand(command);
     return tempId;
@@ -224,7 +267,9 @@ export default class Todoist {
     let numSeenLast = 0;
 
     do {
-      const {data} = await this.http.post<{ items: (CompletedItem & { notes: Note[] })[] }>('https://api.todoist.com/sync/v8/completed/get_all', {
+      const { data } = await this.http.post<{
+        items: (CompletedItem & { notes: Note[] })[];
+      }>('https://api.todoist.com/sync/v8/completed/get_all', {
         project_id: projectId,
         annotate_notes: true,
         limit: 200,
@@ -232,8 +277,8 @@ export default class Todoist {
       });
 
       numSeenLast = data.items.length;
-      allItems.push(...data.items.map(this.completedItemToProper))
-      notes.push(...data.items.map(item => item.notes).flat())
+      allItems.push(...data.items.map(this.completedItemToProper));
+      notes.push(...data.items.map(item => item.notes).flat());
     } while (numSeenLast != 0);
 
     return [allItems, notes];
@@ -242,15 +287,18 @@ export default class Todoist {
   getNotesForItem(item: ItemLike, allNotes: Note[]) {
     return allNotes
       .filter(note => note.item_id === item.id)
-      .sort((a, b) => a.id - b.id)
+      .sort((a, b) => a.id - b.id);
   }
 
   isItemManaged(item: ItemLike, itemNotes: Note[]) {
-    return itemNotes.length && itemNotes.some(note => note.content.startsWith('CanvasID:'))
+    return (
+      itemNotes.length &&
+      itemNotes.some(note => note.content.startsWith('CanvasID:'))
+    );
   }
 
   dateToTodoist(date: Date) {
-    return date.toISOString().substring(0, 19) + 'Z'
+    return date.toISOString().substring(0, 19) + 'Z';
   }
 
   chunkArrayInGroups<T>(arr: T[], size: number) {
@@ -266,7 +314,7 @@ export default class Todoist {
       checked: 1,
       content: item.content,
       id: item.task_id,
-      project_id: item.project_id,
-    }
+      project_id: item.project_id
+    };
   }
 }
