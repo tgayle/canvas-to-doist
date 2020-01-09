@@ -13,14 +13,10 @@ export type Project = {
   parent_id: number;
 }
 
-export type Item = {
-  id: number;
-  project_id: number;
-  content: string;
+export type Item = ItemLike & {
   priority: number;
   due?: DueDateInfo;
   parent_id?: number;
-  checked: 0 | 1;
   date_added: ParseThisStringAsDate;
 }
 
@@ -48,4 +44,20 @@ export type Command = {
   args: {[key: string]: any};
   uuid: string;
   temp_id: string;
+}
+
+export type CompletedItem = {
+  task_id: number;
+  completed_date: ParseThisStringAsDate;
+  project_id: number;
+  id: number;
+  content: string;
+  note_count: number;
+}
+
+export type ItemLike = {
+  checked: 0 | 1;
+  content: string;
+  id: number;
+  project_id: number;
 }

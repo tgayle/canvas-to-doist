@@ -4,7 +4,7 @@ import Todoist from './todoist';
 import buildDatabase from './db';
 import canvasToTodoistMap from './canvasTodoistMappings'
 import { Assignment, Course, AssignmentSubmission } from './types/canvas';
-import { Item, Note, Project } from './types/todoist';
+import { Item, Note, Project, ItemLike } from './types/todoist';
 
 (async function () {
   config()
@@ -39,22 +39,21 @@ async function processCourses(canvas: Canvas, doist: Todoist, courses: Course[],
     console.log(`${course.name}: `)
 
     console.log('Fetching course info...')
-    const [assignments, assignmentSubmissionMap, projectItemInfo] = await Promise.all([
+    const [assignments, assignmentSubmissionMap, assignmentToItems] = await Promise.all([
       canvas.getAssignments(course.id), 
       canvas.getSubmissions(course.id), 
       doist.getProjectItemsMap(project.id, notes)
     ])
 
-    const [courseItems, assignmentToItems] = projectItemInfo
-
     await Promise.all(assignments.map(async (assignment) => {
-      const itemId = assignmentToItems[assignment.id];
-      if (itemId) {
-        const item = courseItems.find(item => item.id == itemId) as Item // can't be null at this point
+      const item = assignmentToItems[assignment.id];
+      if (item) {
         const updated = await updateItemAsNecessary(canvas, doist, assignment, item, assignmentSubmissionMap)
 
         if (updated) {
           console.log(`Assignment '${assignment.name}' was updated.`)
+        } else {
+          console.log(`[${course.name}] Assignment '${assignment.name}' did not need to be updated!`)
         }
       } else {
         await createAssignmentItem(canvas, doist, assignment, project.id, assignmentSubmissionMap)
@@ -68,16 +67,17 @@ async function processCourses(canvas: Canvas, doist: Todoist, courses: Course[],
   console.log('Done!')
   console.log('Committing...');
 
-  console.log(doist.pendingCommands);
-  // const todoistResult = await doist.commitCommands();
-  // console.log(todoistResult);
+  const todoistResult = await doist.commitCommands();
+  console.log(todoistResult);
+
+  console.log('Finished!')
 }
 
 async function updateItemAsNecessary(
   canvas: Canvas,
   todoist: Todoist,
   assignment: Assignment,
-  item: Item,
+  item: ItemLike,
   assignmentSubmissionMap: { [key: number]: AssignmentSubmission }) {
   // ignore items already marked as completed.
   if (item.checked) return false;

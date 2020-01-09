@@ -1,6 +1,6 @@
 import axios, { AxiosInstance, AxiosResponse } from 'axios';
 import { v4 as uuid } from 'uuid';
-import { SyncResponse, Project, Item, Note, Command } from './types/todoist';
+import { SyncResponse, Project, Item, Note, Command, CompletedItem, ItemLike } from './types/todoist';
 
 export default class Todoist {
   executeCommandsImmediately = false;
@@ -76,9 +76,10 @@ export default class Todoist {
   }
 
   async getProjectItems(projectId: number) {
-    const [uncompleted, [completedItems, completedTodos]] = await Promise.all([this.getItems(), this.getCompletedItems(projectId)]);
+    const [uncompleted, [completedItems, completedNotes]] = await Promise.all([this.getItems(), this.getCompletedItems(projectId)]);
 
-    const res = uncompleted.items.filter(item => item.project_id === projectId);
+    const uncompletedItems: ItemLike[] = uncompleted.items
+    const res = uncompletedItems.filter(item => item.project_id === projectId);
     res.push(...completedItems);
     return res;
   }
@@ -92,7 +93,7 @@ export default class Todoist {
     return res.data.notes;
   }
 
-  async getProjectItemsMap(projectId: number, allNotes: Note[]): Promise<[Item[], { [key: number]: number }]> {
+  async getProjectItemsMap(projectId: number, allNotes: Note[]): Promise<{ [key: number]: ItemLike }> {
     const [ uncompletedItems, [completedItems, completedItemNotes]] = await Promise.all([
       this.getProjectItems(projectId), 
       this.getCompletedItems(projectId)
@@ -103,19 +104,24 @@ export default class Todoist {
     const managedItems = [...uncompletedItems, ...completedItems]
       .filter(this.itemIsManaged(projectId, allNotes));
 
-    const assignmentToItemId: { [key: number]: number } = {};
+    const assignmentToItemId: { [key: number]: ItemLike } = {};
 
 
     managedItems.forEach(item => {
       const itemNotes = this.getNotesForItem(item, allNotes)
-      assignmentToItemId[Number(itemNotes[0].content.split(' ')[1])] = item.id
+      const assignmentIdItem = itemNotes.find(note => note.content.startsWith('CanvasID'))
+      
+      if (assignmentIdItem) {
+        const noteText = assignmentIdItem.content;
+        assignmentToItemId[Number(noteText.substring(noteText.indexOf(' ')).trim())] = item
+      }
     })
 
-    return [managedItems, assignmentToItemId]
+    return assignmentToItemId
   }
 
   itemIsManaged(projectId: number, allNotes: Note[]) {
-    return (item: Item) => {
+    return (item: ItemLike) => {
       return item.project_id === projectId && this.isItemManaged(item, this.getNotesForItem(item, allNotes));
     }
   }
@@ -211,14 +217,14 @@ export default class Todoist {
     return tempId;
   }
 
-  async getCompletedItems(projectId: number): Promise<[Item[], Note[]]> {
-    const allItems: Item[] = [];
+  async getCompletedItems(projectId: number): Promise<[ItemLike[], Note[]]> {
+    const allItems: ItemLike[] = [];
     const notes: Note[] = [];
 
     let numSeenLast = 0;
 
     do {
-      const {data} = await this.http.post<{ items: (Item & { notes: Note[] })[] }>('https://api.todoist.com/sync/v8/completed/get_all', {
+      const {data} = await this.http.post<{ items: (CompletedItem & { notes: Note[] })[] }>('https://api.todoist.com/sync/v8/completed/get_all', {
         project_id: projectId,
         annotate_notes: true,
         limit: 200,
@@ -226,20 +232,20 @@ export default class Todoist {
       });
 
       numSeenLast = data.items.length;
-      allItems.push(...data.items)
+      allItems.push(...data.items.map(this.completedItemToProper))
       notes.push(...data.items.map(item => item.notes).flat())
     } while (numSeenLast != 0);
 
     return [allItems, notes];
   }
 
-  getNotesForItem(item: Item, allNotes: Note[]) {
+  getNotesForItem(item: ItemLike, allNotes: Note[]) {
     return allNotes
       .filter(note => note.item_id === item.id)
       .sort((a, b) => a.id - b.id)
   }
 
-  isItemManaged(item: Item, itemNotes: Note[]) {
+  isItemManaged(item: ItemLike, itemNotes: Note[]) {
     return itemNotes.length && itemNotes.some(note => note.content.startsWith('CanvasID:'))
   }
 
@@ -253,5 +259,14 @@ export default class Todoist {
       myArray.push(arr.slice(i, i + size));
     }
     return myArray;
+  }
+
+  completedItemToProper(item: CompletedItem): ItemLike {
+    return {
+      checked: 1,
+      content: item.content,
+      id: item.task_id,
+      project_id: item.project_id,
+    }
   }
 }
