@@ -8,7 +8,7 @@ import { Item, Note, Project, ItemLike } from './types/todoist';
 (async function () {
   config()
 
-  const canvas = new Canvas(process.env.CANVAS!!, "fgcu")
+  const canvas = new Canvas(process.env.CANVAS!!, process.env.CANVAS_DOMAIN!!)
   const doist = new Todoist(process.env.TODOIST!!)
 
   let [courses, projects, notes] = await Promise.all([
