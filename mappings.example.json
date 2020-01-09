@@ -1,0 +1,11 @@
+{
+  "info": "Maps a canvas course id to a todoist item id",
+  "more_info": "Rename this file to mappings.json and fill in the ids for your canvas course and Todoist projects",
+  "projects": {
+    "000001": 1000000001,
+    "000002": 1000000002,
+    "000003": 1000000003,
+    "000004": 1000000004,
+    "000005": 1000000005
+  }
+}
