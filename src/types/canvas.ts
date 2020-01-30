@@ -62,4 +62,6 @@ export type AssignmentSubmission = {
   workflow_state: 'submitted' | 'unsubmitted' | 'graded' | 'pending_review';
   submitted_at: ParseThisStringAsDate;
   assignment_id: number;
+  missing: boolean;
+  late: boolean;
 };

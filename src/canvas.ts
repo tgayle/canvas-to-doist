@@ -67,9 +67,10 @@ export default class Canvas {
 
     const submissions = response.data.filter(sub => {
       return (
-        sub.workflow_state === 'graded' ||
-        sub.workflow_state === 'submitted' ||
-        sub.workflow_state === 'pending_review'
+        !sub.missing &&
+        (sub.workflow_state === 'graded' ||
+          sub.workflow_state === 'submitted' ||
+          sub.workflow_state === 'pending_review')
       );
     });
 
