@@ -37,7 +37,7 @@ async function processCourses(
       console.error(
         `Course ${course.name} (${course.id}) did not have a corresponding Todoist project, skipping...`
       );
-      return;
+      return 0;
     }
 
     console.log(`${course.name}: `);
@@ -53,8 +53,9 @@ async function processCourses(
       doist.getProjectItemsMap(project.id, notes)
     ]);
 
-    await Promise.all(
+    const assignmentData = await Promise.all(
       assignments.map(async assignment => {
+        let assignmentUpdated = false;
         const item = assignmentToItems[assignment.id];
         if (item) {
           const updated = await updateItemAsNecessary(
@@ -66,6 +67,7 @@ async function processCourses(
           );
 
           if (updated) {
+            assignmentUpdated = true;
             console.log(`Assignment '${assignment.name}' was updated.`);
           } else {
             console.log(
@@ -73,6 +75,8 @@ async function processCourses(
             );
           }
         } else {
+          assignmentUpdated = true;
+
           await createAssignmentItem(
             canvas,
             doist,
@@ -84,17 +88,31 @@ async function processCourses(
             `[${course.name}] Assignment '${assignment.name}' was given an item.`
           );
         }
+
+        return {
+          updated: assignmentUpdated
+        };
       })
+    );
+
+    return assignmentData.reduce(
+      (prev, curr) => (curr.updated ? prev + 1 : prev),
+      0
     );
   });
 
   console.log('Waiting for all courses to finish their business...');
-  await Promise.all(coursesPromise);
+  const endingData = await Promise.all(coursesPromise);
   console.log('Done!');
   console.log('Committing...');
 
-  const todoistResult = await doist.commitCommands();
-  console.log(todoistResult);
+  const totalAssignmentsUpdated = endingData.reduce(
+    (prev, curr) => prev + curr,
+    0
+  );
+
+  await doist.commitCommands();
+  console.log(`${totalAssignmentsUpdated} assignments were updated.`);
 
   console.log('Finished!');
 }
