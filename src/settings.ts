@@ -5,6 +5,7 @@ type CTDConfig = {
   token_canvas: string | null;
   token_todoist: string | null;
   enrollment_term: number;
+  canvas_domain: string | null;
 };
 
 type ConfigParams = {
@@ -14,7 +15,8 @@ type ConfigParams = {
 const CONFIG_DEFAULTS: CTDConfig = {
   token_canvas: null,
   enrollment_term: -1,
-  token_todoist: null
+  token_todoist: null,
+  canvas_domain: null
 };
 
 const configSecurity: Record<keyof CTDConfig | string, ConfigParams> = {
@@ -26,6 +28,9 @@ const configSecurity: Record<keyof CTDConfig | string, ConfigParams> = {
   },
   token_todoist: {
     private: true
+  },
+  canvas_domain: {
+    private: true
   }
 };
 
@@ -35,13 +40,6 @@ export class Settings {
     projectName: 'canvas-to-doist',
     defaults: CONFIG_DEFAULTS
   });
-
-  constructor() {
-    // Touch file to make sure it exists on first launch.
-    if (!this.config.has('token_canvas')) {
-      this.canvasToken = null;
-    }
-  }
 
   get canvasToken() {
     return this.config.get('token_canvas', null);
@@ -65,6 +63,14 @@ export class Settings {
 
   set enrollmentTerm(term: number) {
     this.config.set('enrollment_term', term);
+  }
+
+  get canvasDomain() {
+    return this.config.get('canvas_domain', null);
+  }
+
+  set canvasDomain(domain: string | null) {
+    this.config.set('canvas_domain', domain);
   }
 
   getAllOptions(): { key: string; value: any; hidden: boolean }[] {

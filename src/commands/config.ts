@@ -5,37 +5,51 @@ import Settings from '../settings';
 
 export default class ConfigCommand extends Command {
   static flags = {
-    validate: flags.boolean({ default: true }),
-    list: flags.boolean(),
     includePrivate: flags.boolean()
   };
 
-  async run() {
-    const { flags } = this.parse(ConfigCommand);
+  static strict = false;
 
-    if (flags.list) {
-      const settings = Settings.getAllOptions();
-      cli.table(settings, {
-        key: {},
-        value: {
-          get: row => {
-            return typeof row.value != 'undefined' && row !== null
-              ? row.hidden && !flags.includePrivate
-                ? '<hidden>'
-                : row.value
-              : 'null';
-          }
-        },
-        hidden: {
-          header: 'private'
-        }
-      });
-
-      return;
+  static args = [
+    {
+      name: 'action',
+      required: true,
+      default: 'list',
+      options: ['list', 'validate']
     }
+  ];
 
-    if (flags.validate) {
-      return new ValidateConfig([], this.config).run();
+  async run() {
+    const { flags, args } = this.parse(ConfigCommand);
+
+    switch (args.action) {
+      case 'list': {
+        const settings = Settings.getAllOptions();
+        cli.table(settings, {
+          key: {},
+          value: {
+            get: row => {
+              return typeof row.value != 'undefined' && row !== null
+                ? row.hidden && !flags.includePrivate
+                  ? '<hidden>'
+                  : row.value
+                : 'null';
+            }
+          },
+          hidden: {
+            header: 'private'
+          }
+        });
+
+        return;
+      }
+
+      case 'validate': {
+        return new ValidateConfig([], this.config).run();
+      }
+
+      default:
+        this.error('Invalid command.');
     }
   }
 }

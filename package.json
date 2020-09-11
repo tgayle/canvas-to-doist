@@ -16,13 +16,18 @@
     "cli-ux": "^5.5.0",
     "conf": "^7.1.2",
     "dotenv": "^8.2.0",
+    "listr": "^0.14.3",
     "tslib": "^1.13.0",
     "uuid": "^3.3.3"
   },
   "devDependencies": {
     "@oclif/dev-cli": "^1.22.2",
+    "@types/eslint": "^7.2.2",
+    "@types/eslint-plugin-prettier": "^3.1.0",
+    "@types/listr": "^0.14.2",
     "@types/nedb": "^1.8.9",
     "@types/node": "^10.17.32",
+    "@types/prettier": "^1.19.1",
     "@types/uuid": "^3.4.6",
     "@typescript-eslint/eslint-plugin": "^2.15.0",
     "eslint": "^5.16.0",
