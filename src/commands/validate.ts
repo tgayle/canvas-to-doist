@@ -9,6 +9,10 @@ export default class ValidateConfig extends Command {
       {
         title: 'Validate Canvas Token',
         skip: () => {
+          if (settings.enrollmentTerm < 0) {
+            this.warn('Canvas enrollment term is missing.');
+          }
+
           if (settings.canvasToken === null) {
             return 'Canvas token missing.';
           }

@@ -12,12 +12,15 @@ type ConfigParams = {
   private: boolean;
 };
 
-const CONFIG_DEFAULTS: CTDConfig = {
+const CONFIG_DEFAULTS: CTDConfig = Object.freeze({
   token_canvas: null,
   enrollment_term: -1,
   token_todoist: null,
   canvas_domain: null
-};
+});
+
+export const CONFIG_KEYS = Object.keys(CONFIG_DEFAULTS);
+export type TYPE_CONFIG_KEYS = keyof CTDConfig;
 
 const configSecurity: Record<keyof CTDConfig | string, ConfigParams> = {
   enrollment_term: {

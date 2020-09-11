@@ -1,7 +1,8 @@
 import Command, { flags } from '@oclif/command';
 import cli from 'cli-ux';
 import ValidateConfig from './validate';
-import Settings from '../settings';
+import Settings, { CONFIG_KEYS, TYPE_CONFIG_KEYS } from '../settings';
+import settings from '../settings';
 
 export default class ConfigCommand extends Command {
   static flags = {
@@ -15,7 +16,18 @@ export default class ConfigCommand extends Command {
       name: 'action',
       required: true,
       default: 'list',
-      options: ['list', 'validate']
+      options: ['list', 'validate', 'set']
+    },
+    {
+      name: 'configKey',
+      required: false,
+      default: null,
+      options: CONFIG_KEYS
+    },
+    {
+      name: 'configValue',
+      required: false,
+      default: undefined
     }
   ];
 
@@ -37,7 +49,7 @@ export default class ConfigCommand extends Command {
             }
           },
           hidden: {
-            header: 'private'
+            // header: 'private'
           }
         });
 
@@ -46,6 +58,36 @@ export default class ConfigCommand extends Command {
 
       case 'validate': {
         return new ValidateConfig([], this.config).run();
+      }
+
+      case 'set': {
+        const key = args.configKey;
+        const val = args.configValue;
+
+        if (typeof key !== 'string') {
+          throw new Error(`Invalid key '${key}' was provided.`);
+        }
+
+        if (typeof val === 'undefined') {
+          throw new Error('A value or null must be specified.');
+        }
+
+        switch (key as TYPE_CONFIG_KEYS) {
+          case 'canvas_domain':
+            settings.canvasDomain = val;
+            break;
+          case 'enrollment_term':
+            settings.enrollmentTerm = parseInt(val);
+            break;
+          case 'token_canvas':
+            settings.canvasToken = val;
+            break;
+          case 'token_todoist':
+            settings.todoistToken = val;
+            break;
+        }
+
+        return;
       }
 
       default:
