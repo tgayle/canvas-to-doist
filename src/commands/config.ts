@@ -62,7 +62,7 @@ export default class ConfigCommand extends Command {
 
       case 'set': {
         const key = args.configKey;
-        const val = args.configValue;
+        let val = args.configValue;
 
         if (typeof key !== 'string') {
           throw new Error(`Invalid key '${key}' was provided.`);
@@ -72,12 +72,16 @@ export default class ConfigCommand extends Command {
           throw new Error('A value or null must be specified.');
         }
 
+        if (val === 'null') {
+          val = null;
+        }
+
         switch (key as TYPE_CONFIG_KEYS) {
           case 'canvas_domain':
             settings.canvasDomain = val;
             break;
           case 'enrollment_term':
-            settings.enrollmentTerm = parseInt(val);
+            settings.enrollmentTerm = val === null ? -1 : parseInt(val);
             break;
           case 'token_canvas':
             settings.canvasToken = val;
