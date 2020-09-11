@@ -13,6 +13,8 @@
     "@oclif/plugin-help": "^3.2.0",
     "@typescript-eslint/parser": "^2.15.0",
     "axios": "^0.19.1",
+    "cli-ux": "^5.5.0",
+    "conf": "^7.1.2",
     "dotenv": "^8.2.0",
     "tslib": "^1.13.0",
     "uuid": "^3.3.3"
