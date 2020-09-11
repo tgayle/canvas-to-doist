@@ -1,32 +1,71 @@
 {
   "name": "canvas_to_doist",
-  "version": "1.0.0",
   "description": "Moves Canvas items into Todoist",
-  "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
-    "start": "ts-node src/index.ts"
-  },
+  "version": "1.0.0",
   "author": "Travis Gayle <travis@tgayle.com>",
-  "license": "ISC",
+  "bin": {
+    "canvas-to-doist": "./bin/run"
+  },
+  "bugs": "https://github.com/tgayle/canvas_to_doist/issues",
   "dependencies": {
+    "@oclif/command": "^1.8.0",
+    "@oclif/config": "^1.17.0",
+    "@oclif/plugin-help": "^3.2.0",
     "@typescript-eslint/parser": "^2.15.0",
     "axios": "^0.19.1",
     "dotenv": "^8.2.0",
-    "ts-node": "^8.5.4",
-    "typescript": "^3.7.4",
+    "tslib": "^1.13.0",
     "uuid": "^3.3.3"
   },
   "devDependencies": {
+    "@oclif/dev-cli": "^1.22.2",
     "@types/nedb": "^1.8.9",
-    "@types/node": "^13.1.4",
+    "@types/node": "^10.17.32",
     "@types/uuid": "^3.4.6",
     "@typescript-eslint/eslint-plugin": "^2.15.0",
-    "eslint": "^6.8.0",
+    "eslint": "^5.16.0",
     "eslint-config-airbnb-typescript": "^6.3.1",
+    "eslint-config-oclif": "^3.1.0",
+    "eslint-config-oclif-typescript": "^0.1.0",
     "eslint-config-prettier": "^6.9.0",
     "eslint-plugin-prettier": "^3.1.2",
     "eslint-plugin-react": "^7.17.0",
     "eslint-plugin-react-hooks": "^2.3.0",
-    "prettier": "^1.19.1"
-  }
+    "globby": "^10.0.2",
+    "prettier": "^1.19.1",
+    "ts-node": "^8.10.2",
+    "typescript": "^3.9.7"
+  },
+  "engines": {
+    "node": ">=8.0.0"
+  },
+  "files": [
+    "/bin",
+    "/lib",
+    "/npm-shrinkwrap.json",
+    "/oclif.manifest.json"
+  ],
+  "homepage": "https://github.com/tgayle/canvas_to_doist",
+  "keywords": [
+    "oclif"
+  ],
+  "license": "ISC",
+  "main": "lib/index.js",
+  "oclif": {
+    "commands": "./lib/commands",
+    "bin": "canvas-to-doist",
+    "plugins": [
+      "@oclif/plugin-help"
+    ]
+  },
+  "repository": "tgayle/canvas_to_doist",
+  "scripts": {
+    "postpack": "rm -f oclif.manifest.json",
+    "posttest": "eslint . --ext .ts --config .eslintrc",
+    "prepack": "rm -rf lib && tsc -b && oclif-dev manifest && oclif-dev readme",
+    "start": "ts-node src/index.ts",
+    "test": "echo NO TESTS",
+    "version": "oclif-dev readme && git add README.md"
+  },
+  "types": "lib/index.d.ts"
 }
