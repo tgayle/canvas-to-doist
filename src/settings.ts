@@ -37,6 +37,12 @@ const configSecurity: Record<keyof CTDConfig | string, ConfigParams> = {
   }
 };
 
+type SettingsMetaData<K extends keyof CTDConfig = keyof CTDConfig> = {
+  key: K;
+  value: CTDConfig[K];
+  hidden: boolean;
+};
+
 // TODO: Allow specifying config from another path.
 export class Settings {
   private config = new Conf<CTDConfig>({
@@ -76,20 +82,20 @@ export class Settings {
     this.config.set('canvas_domain', domain);
   }
 
-  getAllOptions(): { key: string; value: any; hidden: boolean }[] {
-    const settingsJson: Record<string, any> = JSON.parse(
+  getAllOptions(): SettingsMetaData[] {
+    const settingsJson: CTDConfig = JSON.parse(
       readFileSync(this.config.path).toString()
     );
 
-    const options: { key: string; value: any; hidden: boolean }[] = [];
+    const options: SettingsMetaData[] = [];
 
-    for (const key of Object.keys(settingsJson)) {
-      const value: any = settingsJson[key];
+    for (const key of Object.keys(settingsJson) as (keyof CTDConfig)[]) {
+      const value = settingsJson[key];
 
       options.push({
         key,
         value,
-        hidden: configSecurity[key]?.private ?? true
+        hidden: configSecurity[key].private ?? true
       });
     }
 
