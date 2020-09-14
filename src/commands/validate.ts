@@ -47,6 +47,8 @@ export async function validateConfig() {
   return await tasks.run();
 }
 export default class ValidateConfig extends Command {
+  static description = 'Validates configuration.';
+
   async run() {
     await validateConfig();
   }

@@ -5,6 +5,8 @@ import Settings, { CONFIG_KEYS, TYPE_CONFIG_KEYS } from '../settings';
 import settings from '../settings';
 
 export default class ConfigCommand extends Command {
+  static description = 'Update settings and canvas/todoist token values';
+
   static flags = {
     includePrivate: flags.boolean()
   };
