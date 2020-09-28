@@ -27,7 +27,7 @@ export default class Canvas {
     };
   }
 
-  async getCourses() {
+  async getCourses(term?: number) {
     const response = await this.http.get<PotentialCourse[]>('/courses', {
       params: {
         enrollment_type: 'student',
@@ -37,6 +37,10 @@ export default class Canvas {
     });
 
     const courses = response.data.filter(isValidCourse);
+
+    if (typeof term === 'number') {
+      return courses.filter(course => course.enrollment_term_id === term);
+    }
 
     return courses;
   }

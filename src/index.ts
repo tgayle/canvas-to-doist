@@ -17,7 +17,7 @@ import { Item, Note, Project, ItemLike } from './types/todoist';
     doist.getNotes()
   ]);
 
-  courses = courses.filter(c => c.enrollment_term_id === 286);
+  courses = courses.filter(c => c.enrollment_term_id === 1045);
 
   await processCourses(canvas, doist, courses, projects, notes);
 })();

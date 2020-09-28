@@ -4,13 +4,29 @@ import Listr from 'listr';
 import Canvas from '../canvas';
 import Todoist from '../todoist';
 
-export async function validateConfig() {
+type ConfigFlags = {
+  canvas: {
+    token: boolean;
+    term: boolean;
+    skip: boolean;
+  };
+};
+
+const defaultFlags: ConfigFlags = {
+  canvas: {
+    skip: false,
+    term: false,
+    token: true
+  }
+};
+
+export async function validateConfig(flags: ConfigFlags = defaultFlags) {
   const tasks = new Listr([
     {
-      title: 'Validate Canvas Token',
+      title: 'Canvas',
       skip: () => {
-        if (settings.enrollmentTerm < 0) {
-          console.warn('Warning: Canvas enrollment term is missing.');
+        if (flags.canvas.skip) {
+          return 'Skipped.';
         }
 
         if (settings.canvasToken === null) {
@@ -21,13 +37,50 @@ export async function validateConfig() {
           return 'Canvas domain not set.';
         }
       },
-      task: async () => {
-        const canvas = new Canvas(
-          settings.canvasToken!,
-          settings.canvasDomain!
-        );
+      task: () => {
+        return new Listr([
+          {
+            title: 'Validate Token',
+            skip() {
+              if (!flags.canvas.token) {
+                return 'Skipped.';
+              }
+            },
+            task: async () => {
+              const canvas = new Canvas(
+                settings.canvasToken!,
+                settings.canvasDomain!
+              );
 
-        await canvas.getCourses();
+              await canvas.getCourses();
+            }
+          },
+          {
+            title: 'Validate Enrollment Term',
+            skip: () => {
+              if (!flags.canvas.term) {
+                return 'Skipped';
+              }
+              if (settings.enrollmentTerm < 0) {
+                throw new Error('Enrollment term is missing.');
+              }
+            },
+            task: async () => {
+              const canvas = new Canvas(
+                settings.canvasToken!,
+                settings.canvasDomain!
+              );
+
+              const termId = settings.enrollmentTerm;
+
+              const termCourses = (await canvas.getCourses()).filter(
+                course => course.enrollment_term_id === termId
+              );
+
+              return `${termCourses.length} courses found for the given ernollment term.`;
+            }
+          }
+        ]);
       }
     },
     {

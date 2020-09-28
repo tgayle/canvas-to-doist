@@ -1,6 +1,8 @@
 {
-  "extends": [
-    "oclif",
-    "oclif-typescript"
-  ]
+  "extends": ["oclif", "oclif-typescript", "prettier"],
+  "rules": {
+    "no-empty-function": "off",
+    "@typesync-eslint/no-empty-function": "off",
+    "no-return-await": "off"
+  }
 }
