@@ -10,6 +10,12 @@ type ConfigFlags = {
     term: boolean;
     skip: boolean;
   };
+
+  todoist: {
+    skip: boolean;
+    projects: boolean;
+    token: boolean;
+  };
 };
 
 const defaultFlags: ConfigFlags = {
@@ -17,10 +23,22 @@ const defaultFlags: ConfigFlags = {
     skip: false,
     term: false,
     token: true
+  },
+  todoist: {
+    skip: false,
+    projects: true,
+    token: true
   }
 };
 
-export async function validateConfig(flags: ConfigFlags = defaultFlags) {
+export async function validateConfig(
+  _flags: Partial<ConfigFlags> = defaultFlags
+) {
+  const flags = Object.assign(
+    Object.assign({}, defaultFlags),
+    _flags
+  ) as ConfigFlags;
+
   const tasks = new Listr(
     [
       {
@@ -85,15 +103,43 @@ export async function validateConfig(flags: ConfigFlags = defaultFlags) {
         }
       },
       {
-        title: 'Validate Todoist Token',
+        title: 'Todoist',
         skip: () => {
+          if (flags.todoist.skip) {
+            return 'Skipped.';
+          }
+
           if (settings.todoistToken === null) {
             return 'Todoist token missing.';
           }
         },
         task: async () => {
           const todoist = new Todoist(settings.todoistToken!);
-          await todoist.getProjects();
+
+          return new Listr([
+            {
+              title: 'Validate Token',
+              skip: () => {
+                if (!flags.todoist.token) {
+                  return 'Skipped';
+                }
+              },
+              task: async () => {
+                await todoist.getProjects();
+              }
+            },
+            {
+              title: 'Validate Projects',
+              skip: () => {
+                if (!flags.todoist.projects) {
+                  return 'Skipped';
+                }
+              },
+              task: async () => {
+                return 'TODO: validate projects.';
+              }
+            }
+          ]);
         }
       }
     ],

@@ -43,7 +43,21 @@ export default class ConfigCommand extends Command {
           key: {},
           value: {
             get: row => {
-              return typeof row.value != 'undefined' && row !== null
+              const doesNotExist =
+                typeof row.value !== 'undefined' && row !== null;
+
+              if (doesNotExist) {
+                if (row.hidden && !flags.includePrivate) {
+                  return '<hidden>';
+                }
+                if (typeof row.value === 'object') {
+                  return JSON.stringify(row.value, null, 2);
+                }
+                return row.value;
+              }
+              return 'null';
+
+              return doesNotExist
                 ? row.hidden && !flags.includePrivate
                   ? '<hidden>'
                   : row.value

@@ -1,11 +1,18 @@
 import Conf from 'conf';
 import { readFileSync } from 'fs';
 
+export type TodoistProjectId = number;
+export type CanvasCourseId = number;
+export type CanvasEnrollmentId = number;
+export type CanvasProjectMap = Record<CanvasCourseId, TodoistProjectId>;
+export type CourseProjectMapping = Record<CanvasEnrollmentId, CanvasProjectMap>;
+
 type CTDConfig = {
   token_canvas: string | null;
   token_todoist: string | null;
   enrollment_term: number;
   canvas_domain: string | null;
+  project_mappings: CourseProjectMapping;
 };
 
 type ConfigParams = {
@@ -16,13 +23,14 @@ const CONFIG_DEFAULTS: CTDConfig = Object.freeze({
   token_canvas: null,
   enrollment_term: -1,
   token_todoist: null,
-  canvas_domain: null
+  canvas_domain: null,
+  project_mappings: {}
 });
 
 export const CONFIG_KEYS = Object.keys(CONFIG_DEFAULTS);
 export type TYPE_CONFIG_KEYS = keyof CTDConfig;
 
-const configSecurity: Record<keyof CTDConfig | string, ConfigParams> = {
+const configSecurity: Record<keyof CTDConfig, ConfigParams> = {
   enrollment_term: {
     private: true
   },
@@ -34,6 +42,9 @@ const configSecurity: Record<keyof CTDConfig | string, ConfigParams> = {
   },
   canvas_domain: {
     private: true
+  },
+  project_mappings: {
+    private: false
   }
 };
 
@@ -80,6 +91,14 @@ export class Settings {
 
   set canvasDomain(domain: string | null) {
     this.config.set('canvas_domain', domain);
+  }
+
+  get projectMappings(): CourseProjectMapping {
+    return this.config.get('project_mappings', {});
+  }
+
+  set projectMappings(mappings: CourseProjectMapping) {
+    this.config.set('project_mappings', mappings);
   }
 
   getAllOptions(): SettingsMetaData[] {

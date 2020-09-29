@@ -1,6 +1,6 @@
 import { Command } from '@oclif/command';
 import { validateConfig } from '../validate';
-import settings from '../../settings';
+import settings, { CanvasProjectMap } from '../../settings';
 import Canvas from '../../canvas';
 import * as inquirer from 'inquirer';
 import { Course } from '../../types/canvas';
@@ -59,13 +59,42 @@ export default class CanvasCommand extends Command {
       name: {}
     });
 
-    const confirmed = await cli.confirm(
-      'Term id will be set to include the following courses. Confirm?'
-    );
-
-    if (confirmed) {
+    if (
+      await cli.confirm(
+        `Term ID will be set to ${selectedCourse.enrollment_term_id}. Confirm?`
+      )
+    ) {
       settings.enrollmentTerm = selectedCourse.enrollment_term_id;
       this.log('Term ID updated to ' + settings.enrollmentTerm);
+
+      const preexistingSelectedCourses =
+        settings.projectMappings[settings.enrollmentTerm];
+
+      const selectedCourses: {
+        selectedTerms: Course[];
+      } = await inquirer.prompt({
+        type: 'checkbox',
+        name: 'selectedTerms',
+        choices: termCourses.map(course => {
+          return {
+            checked: !!preexistingSelectedCourses?.[course.id],
+            value: course,
+            name: course.name
+          };
+        })
+      });
+
+      const newMapping: CanvasProjectMap = {};
+
+      selectedCourses.selectedTerms.forEach(course => {
+        newMapping[course.id] = preexistingSelectedCourses?.[course.id] ?? -1;
+      });
+
+      settings.projectMappings = {
+        ...settings.projectMappings,
+        [settings.enrollmentTerm]: newMapping
+      };
+      this.log('Updated.');
     } else {
       this.log('Cancelled.');
     }
