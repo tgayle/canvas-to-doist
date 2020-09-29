@@ -16,6 +16,12 @@ type ConfigFlags = {
     projects: boolean;
     token: boolean;
   };
+
+  interop: {
+    skip: boolean;
+    failOnMissingCorrespondingProjects: boolean;
+    validateCoursesAndProjects: boolean;
+  };
 };
 
 const defaultFlags: ConfigFlags = {
@@ -28,6 +34,11 @@ const defaultFlags: ConfigFlags = {
     skip: false,
     projects: true,
     token: true
+  },
+  interop: {
+    skip: false,
+    validateCoursesAndProjects: true,
+    failOnMissingCorrespondingProjects: false
   }
 };
 
@@ -137,6 +148,60 @@ export async function validateConfig(
               },
               task: async () => {
                 return 'TODO: validate projects.';
+              }
+            }
+          ]);
+        }
+      },
+      {
+        title: 'Canvas/Todoist Interop',
+        skip: () => {
+          if (flags.interop.skip) {
+            return 'Skipped.';
+          }
+        },
+        task: async () => {
+          return new Listr([
+            {
+              title: 'Validate Courses and Projects',
+              skip: () => {
+                if (!flags.interop.validateCoursesAndProjects) {
+                  return 'Skipped.';
+                }
+              },
+              task: async (_ctx, task) => {
+                const term = settings.enrollmentTerm;
+                const termMappings = settings.projectMappings[term];
+
+                const doist = new Todoist(settings.todoistToken!);
+                const projects = await doist.getProjects();
+
+                const idsMissingProject: number[] = [];
+
+                // TODO: Fix these typings - Object.keys is always string[]?
+                for (const courseId of Object.keys(termMappings)) {
+                  const projectId =
+                    termMappings[(courseId as unknown) as number];
+                  const correspondingProject = projects.find(
+                    project => project.id === ((projectId as unknown) as number)
+                  );
+
+                  if (!correspondingProject) {
+                    // @ts-expect-error
+                    idsMissingProject.push(courseId);
+                  }
+                }
+
+                if (idsMissingProject.length > 0) {
+                  const message = `The courses with IDs ${idsMissingProject.join(
+                    ', '
+                  )} are missing corresponding projects.`;
+                  if (flags.interop.failOnMissingCorrespondingProjects) {
+                    throw new Error(message);
+                  } else {
+                    task.skip(message);
+                  }
+                }
               }
             }
           ]);
