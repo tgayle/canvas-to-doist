@@ -94,7 +94,6 @@ export default class CanvasCommand extends Command {
         ...settings.projectMappings,
         [settings.enrollmentTerm]: newMapping
       };
-      this.log('Updated.');
     } else {
       this.log('Cancelled.');
     }

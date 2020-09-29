@@ -56,12 +56,6 @@ export default class ConfigCommand extends Command {
                 return row.value;
               }
               return 'null';
-
-              return doesNotExist
-                ? row.hidden && !flags.includePrivate
-                  ? '<hidden>'
-                  : row.value
-                : 'null';
             }
           },
           hidden: {
@@ -81,11 +75,11 @@ export default class ConfigCommand extends Command {
         let val = args.configValue;
 
         if (typeof key !== 'string') {
-          throw new Error(`Invalid key '${key}' was provided.`);
+          throw new TypeError(`Invalid key '${key}' was provided.`);
         }
 
         if (typeof val === 'undefined') {
-          throw new Error('A value or null must be specified.');
+          throw new TypeError('A value or null must be specified.');
         }
 
         if (val === 'null') {
