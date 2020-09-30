@@ -107,7 +107,7 @@ export async function validateConfig(
                   course => course.enrollment_term_id === termId
                 );
 
-                return `${termCourses.length} courses found for the given ernollment term.`;
+                return `${termCourses.length} courses found for the given enrollment term.`;
               }
             }
           ]);
