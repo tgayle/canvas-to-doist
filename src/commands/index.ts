@@ -119,7 +119,7 @@ function getCourseSyncTask(
           [
             {
               title: 'Load assignments and submissions',
-              task: async (ctx, task) => {
+              task: async () => {
                 const [
                   _assignments,
                   _assignmentSubmissionMap,
