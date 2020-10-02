@@ -5,6 +5,9 @@
     "@typesync-eslint/no-empty-function": "off",
     "no-return-await": "off",
     "no-implicit-coercion": "off",
-    "no-await-in-loop": "off"
+    "no-await-in-loop": "off",
+    "no-new": "off",
+    "no-use-before-define": "off",
+    "@typescript-eslint/no-use-before-define": "off"
   }
 }
