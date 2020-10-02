@@ -4,7 +4,7 @@ import Canvas from '../canvas';
 import settings, { CanvasCourseId } from '../settings';
 import Todoist from '../todoist';
 import { Assignment, AssignmentSubmission, Course } from '../types/canvas';
-import { ItemLike } from '../types/todoist';
+import { ItemLike, Note, Project } from '../types/todoist';
 import Listr, { ListrTask } from 'listr';
 
 type Await<T> = T extends {
@@ -45,116 +45,19 @@ export default class DefaultCommand extends Command {
     );
     const notes = await doist.getNotes();
 
-    const coursesUpdated: Record<
-      CanvasCourseId,
-      { assignment: Assignment; status: CourseUpdateStatus }[]
-    > = {};
+    const coursesUpdated: Record<CanvasCourseId, CourseUpdateInfo[]> = {};
 
     await new Listr(
       [
-        ...courses.map<ListrTask>(course => {
-          return {
-            title: course.name,
-            task: async (ctx, courseTask) => {
-              const project = projects.find(
-                project => project.id === mappings[course.id]
-              );
-
-              if (!project) {
-                courseTask.skip('No corresponding project found for course.');
-                return;
-              }
-
-              // courseTask.output = 'Loading assignments and submissions';
-
-              let assignments: Assignment[] = [];
-              let assignmentSubmissionMap: Await<ReturnType<
-                Canvas['getSubmissions']
-              >> = {};
-              let assignmentToItems: Await<ReturnType<
-                Todoist['getProjectItemsMap']
-              >> = {};
-
-              return new Listr(
-                [
-                  {
-                    title: 'Loading assignments and submissions',
-                    task: async (ctx, task) => {
-                      const [
-                        _assignments,
-                        _assignmentSubmissionMap,
-                        _assignmentToItems
-                      ] = await Promise.all([
-                        canvas.getAssignments(course.id),
-                        canvas.getSubmissions(course.id),
-                        doist.getProjectItemsMap(project.id, notes)
-                      ]);
-
-                      assignments = _assignments;
-                      assignmentSubmissionMap = _assignmentSubmissionMap;
-                      assignmentToItems = _assignmentToItems;
-                    }
-                  },
-                  {
-                    title: 'Assignments',
-                    task: () => {
-                      return new Listr(
-                        assignments.map<ListrTask>(assignment => {
-                          return {
-                            title: assignment.name,
-                            task: async (ctx, assignmentTask) => {
-                              let status: CourseUpdateStatus =
-                                CourseUpdateStatus.SKIPPED;
-                              const item = assignmentToItems[assignment.id];
-                              if (item) {
-                                const updated = await updateItemAsNecessary(
-                                  doist,
-                                  assignment,
-                                  item,
-                                  assignmentSubmissionMap
-                                );
-
-                                if (updated) {
-                                  assignmentTask.output = `Assignment '${assignment.name}' was updated.`;
-                                  status = CourseUpdateStatus.UPDATED;
-                                } else {
-                                  assignmentTask.output = `[${course.name}] Assignment '${assignment.name}' did not need to be updated!`;
-                                  status = CourseUpdateStatus.SKIPPED;
-                                  assignmentTask.skip('No update necessary');
-                                }
-                              } else {
-                                status = CourseUpdateStatus.NEW;
-
-                                await createAssignmentItem(
-                                  doist,
-                                  assignment,
-                                  project.id,
-                                  assignmentSubmissionMap
-                                );
-                                assignmentTask.output = `[${course.name}] Assignment '${assignment.name}' was given an item.`;
-                              }
-
-                              if (!coursesUpdated[course.id]) {
-                                coursesUpdated[course.id] = [];
-                              }
-
-                              coursesUpdated[course.id].push({
-                                assignment: assignment,
-                                status: status
-                              });
-                            }
-                          };
-                        }),
-                        { concurrent: true }
-                      );
-                    }
-                  }
-                ], // @ts-expect-error
-                { collapse: true }
-              );
-            }
-          };
-        }),
+        ...getCourseSyncTask(
+          courses,
+          projects,
+          mappings,
+          canvas,
+          doist,
+          notes,
+          coursesUpdated
+        ),
 
         {
           title: 'Sync with Todoist',
@@ -167,57 +70,203 @@ export default class DefaultCommand extends Command {
       { collapse: true }
     ).run();
 
-    await new Listr(
-      Object.keys(coursesUpdated).map(_courseId => {
-        const courseId = parseInt(_courseId, 10);
-        const assignments = coursesUpdated[courseId];
+    await listUpdatedCourses(coursesUpdated, courses);
 
-        const course =
-          courses.find(course => course.id === courseId)?.name ??
-          'Unknown? (' + courseId + ')';
-
-        const numUpdated = assignments.filter(
-          a => a.status === CourseUpdateStatus.UPDATED
-        ).length;
-        const numSkipped = assignments.filter(
-          a => a.status === CourseUpdateStatus.SKIPPED
-        ).length;
-        const numCreated = assignments.filter(
-          a => a.status === CourseUpdateStatus.NEW
-        ).length;
-
-        return {
-          title: `${course} (${numCreated} created, ${numUpdated} updated, ${numSkipped} skipped)`,
-          task: () => {
-            return new Listr(
-              assignments.map(assignment => {
-                return {
-                  title: `${CourseUpdateStatus[assignment.status]} - ${
-                    assignment.assignment.name
-                  }`,
-                  skip: () => assignment.status === CourseUpdateStatus.SKIPPED,
-                  task: () => {
-                    return CourseUpdateStatus[assignment.status];
-                  }
-                };
-              }),
-              // @ts-expect-error
-              { collapse: false }
-            );
-          }
-        };
-      }),
-      // @ts-expect-error
-      { collapse: false }
-    ).run();
-
-    this.log(
-      `\nDone! (finished in ${(
-        (new Date().getTime() - startingTime.getTime()) /
-        1000
-      ).toFixed(3)} s)`
-    );
+    const timeElapsed = new Date().getTime() - startingTime.getTime();
+    this.log(`\nDone! (finished in ${(timeElapsed / 1000).toFixed(3)} s)`);
   }
+}
+
+type CourseUpdateInfo = {
+  assignment: Assignment;
+  status: CourseUpdateStatus;
+};
+
+function getCourseSyncTask(
+  courses: Course[],
+  projects: Project[],
+  mappings: Record<number, number>,
+  canvas: Canvas,
+  doist: Todoist,
+  notes: Note[],
+  coursesUpdated: Record<
+    number,
+    { assignment: Assignment; status: CourseUpdateStatus }[]
+  >
+) {
+  return courses.map<ListrTask>(course => {
+    return {
+      title: course.name,
+      task: async (ctx, courseTask) => {
+        const project = projects.find(
+          project => project.id === mappings[course.id]
+        );
+
+        if (!project) {
+          courseTask.skip('No corresponding project found for course.');
+          return;
+        }
+
+        let assignments: Assignment[] = [];
+        let assignmentSubmissionMap: Await<ReturnType<
+          Canvas['getSubmissions']
+        >> = {};
+        let assignmentToItems: Await<ReturnType<
+          Todoist['getProjectItemsMap']
+        >> = {};
+
+        return new Listr(
+          [
+            {
+              title: 'Load assignments and submissions',
+              task: async (ctx, task) => {
+                const [
+                  _assignments,
+                  _assignmentSubmissionMap,
+                  _assignmentToItems
+                ] = await Promise.all([
+                  canvas.getAssignments(course.id),
+                  canvas.getSubmissions(course.id),
+                  doist.getProjectItemsMap(project.id, notes)
+                ]);
+
+                assignments = _assignments;
+                assignmentSubmissionMap = _assignmentSubmissionMap;
+                assignmentToItems = _assignmentToItems;
+              }
+            },
+            {
+              title: 'Assignments',
+              task: () => {
+                return new Listr(
+                  assignments.map<ListrTask>(assignment =>
+                    getAssignmentSyncTask(
+                      assignment,
+                      assignmentToItems,
+                      doist,
+                      assignmentSubmissionMap,
+                      course,
+                      project,
+                      coursesUpdated
+                    )
+                  ),
+                  { concurrent: true }
+                );
+              }
+            }
+          ],
+          // @ts-expect-error
+          { collapse: true }
+        );
+      }
+    };
+  });
+}
+
+function getAssignmentSyncTask(
+  assignment: Assignment,
+  assignmentToItems: { [key: number]: ItemLike },
+  doist: Todoist,
+  assignmentSubmissionMap: { [key: number]: AssignmentSubmission },
+  course: Course,
+  project: Project,
+  coursesUpdated: Record<
+    number,
+    { assignment: Assignment; status: CourseUpdateStatus }[]
+  >
+): Listr.ListrTask<any> {
+  return {
+    title: assignment.name,
+    task: async (ctx, assignmentTask) => {
+      let status: CourseUpdateStatus = CourseUpdateStatus.SKIPPED;
+      const item = assignmentToItems[assignment.id];
+      if (item) {
+        const updated = await updateItemAsNecessary(
+          doist,
+          assignment,
+          item,
+          assignmentSubmissionMap
+        );
+
+        if (updated) {
+          assignmentTask.output = `Assignment '${assignment.name}' was updated.`;
+          status = CourseUpdateStatus.UPDATED;
+        } else {
+          assignmentTask.output = `[${course.name}] Assignment '${assignment.name}' did not need to be updated!`;
+          status = CourseUpdateStatus.SKIPPED;
+          assignmentTask.skip('No update necessary');
+        }
+      } else {
+        status = CourseUpdateStatus.NEW;
+
+        await createAssignmentItem(
+          doist,
+          assignment,
+          project.id,
+          assignmentSubmissionMap
+        );
+        assignmentTask.output = `[${course.name}] Assignment '${assignment.name}' was given an item.`;
+      }
+
+      if (!coursesUpdated[course.id]) {
+        coursesUpdated[course.id] = [];
+      }
+
+      coursesUpdated[course.id].push({
+        assignment: assignment,
+        status: status
+      });
+    }
+  };
+}
+
+async function listUpdatedCourses(
+  coursesUpdated: Record<number, CourseUpdateInfo[]>,
+  courses: Course[]
+) {
+  await new Listr(
+    Object.keys(coursesUpdated).map(_courseId => {
+      const courseId = parseInt(_courseId, 10);
+      const assignments = coursesUpdated[courseId];
+
+      const course =
+        courses.find(course => course.id === courseId)?.name ??
+        'Unknown? (' + courseId + ')';
+
+      const numUpdated = assignments.filter(
+        a => a.status === CourseUpdateStatus.UPDATED
+      ).length;
+      const numSkipped = assignments.filter(
+        a => a.status === CourseUpdateStatus.SKIPPED
+      ).length;
+      const numCreated = assignments.filter(
+        a => a.status === CourseUpdateStatus.NEW
+      ).length;
+
+      return {
+        title: `${course} (${numCreated} created, ${numUpdated} updated, ${numSkipped} skipped)`,
+        task: () => {
+          return new Listr(
+            assignments.map(assignment => {
+              return {
+                title: `${CourseUpdateStatus[assignment.status]} - ${
+                  assignment.assignment.name
+                }`,
+                skip: () => assignment.status === CourseUpdateStatus.SKIPPED,
+                task: () => {
+                  return CourseUpdateStatus[assignment.status];
+                }
+              };
+            }),
+            // @ts-expect-error
+            { collapse: false }
+          );
+        }
+      };
+    }),
+    // @ts-expect-error
+    { collapse: false }
+  ).run();
 }
 
 async function completeItem(
