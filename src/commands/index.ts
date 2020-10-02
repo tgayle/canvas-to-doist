@@ -70,6 +70,7 @@ export default class DefaultCommand extends Command {
       { collapse: true }
     ).run();
 
+    this.log('');
     await listUpdatedCourses(coursesUpdated, courses);
 
     const timeElapsed = new Date().getTime() - startingTime.getTime();
@@ -243,11 +244,15 @@ async function listUpdatedCourses(
         a => a.status === CourseUpdateStatus.NEW
       ).length;
 
+      const nonSkippedAssignments = assignments.filter(
+        a => a.status !== CourseUpdateStatus.SKIPPED
+      );
+
       return {
         title: `${course} (${numCreated} created, ${numUpdated} updated, ${numSkipped} skipped)`,
         task: () => {
           return new Listr(
-            assignments.map(assignment => {
+            nonSkippedAssignments.map(assignment => {
               return {
                 title: `${CourseUpdateStatus[assignment.status]} - ${
                   assignment.assignment.name
