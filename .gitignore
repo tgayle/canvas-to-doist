@@ -1,4 +1,12 @@
-node_modules/
 **.env
-out/
+*-debug.log
+*-error.log
+/.nyc_output
+/dist
+/lib
+/tmp
+/yarn.lock
 mappings.json
+node_modules
+node_modules/
+out/

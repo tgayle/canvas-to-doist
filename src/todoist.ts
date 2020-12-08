@@ -12,7 +12,7 @@ import {
 
 export default class Todoist {
   executeCommandsImmediately = false;
-
+  debug = false; // true to disable sending commit requests to todoist
   private token: string;
   private http: AxiosInstance;
   pendingCommands: Command[] = [];
@@ -30,7 +30,7 @@ export default class Todoist {
   private async queueCommand(command: Command) {
     this.pendingCommands.push(command);
 
-    if (this.executeCommandsImmediately) {
+    if (this.executeCommandsImmediately && !this.debug) {
       await this.commitCommands(this.pendingCommands);
     }
   }
